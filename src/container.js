@@ -1,3 +1,5 @@
+import {devOnlyObject} from "./utils/devOnlyObject";
+
 export const createDIContainer = (init) => {
     const _injectables = {};
     if (init) {
@@ -108,5 +110,3 @@ const overrideReturn = (subject) => (fn) => (...args) => {
     const result = fn(...args)
     return subject(result)
 }
-
-const devOnlyObject = ['test', 'development'].includes(process.env.NODE_ENV) ? (source) => ({ __DEV__: source }) : () => ({})
