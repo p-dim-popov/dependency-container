@@ -1,3 +1,3 @@
-import { DIContainer } from "./container.js";
+import { createDIContainer } from "./container.js";
 
-export const diContainer = new DIContainer();
+export const diContainer = createDIContainer();
