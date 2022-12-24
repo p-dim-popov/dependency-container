@@ -34,6 +34,19 @@ describe("di container", function() {
         );
     });
 
+    it("should throw when circular dependency is found", async function () {
+        const container = createDIContainer({
+            service1: ({service2}) => service2().build(),
+            service2: ({service1}) => service1().build(),
+        });
+
+        const resolve = (async () => container.resolve('service1'))()
+        await expect(resolve).rejects.toEqual(
+            new DIError(DIError.Code.CouldNotResolveDeps, "service1")
+        );
+        await expect(resolve).rejects.toHaveProperty('innerError', new RangeError('Maximum call stack size exceeded'))
+    });
+
     describe("resolve", () => {
         it("should resolve service with dependencies when requested", function() {
             const container = createDIContainer({

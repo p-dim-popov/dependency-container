@@ -55,10 +55,10 @@ const tryResolveInjectable = (services, id) => name => {
         const factory = service.factory;
         try {
             service.value = factory.__diId === id ? factory() : factory(createResolverObject(services, id)());
-        } catch (e) {
-            if (e instanceof DIError) throw e;
+        } catch (error) {
+            if (error instanceof DIError) throw error;
 
-            throw new DIError(DIError.Code.CouldNotResolveDeps, name);
+            throw new DIError(DIError.Code.CouldNotResolveDeps, name, error);
         }
     }
 
@@ -90,9 +90,10 @@ export class DIError extends Error {
         CouldNotResolveDeps: "CouldNotResolveDeps"
     };
 
-    constructor(code, message) {
+    constructor(code, message, error) {
         super(`${code}, ${message}`);
         this.code = code;
+        this.innerError = error;
     }
 }
 
