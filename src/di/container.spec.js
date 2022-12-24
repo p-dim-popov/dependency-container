@@ -1,4 +1,4 @@
-import { DIContainer, DIError } from "./container";
+import { DIContainer, DIError } from "./container.js";
 
 describe("di container", function() {
     it("should instantiate with services", function() {
@@ -26,7 +26,7 @@ describe("di container", function() {
     });
 
     it("should log caught and throw custom error when cannot resolve dependencies", function() {
-        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementationOnce(() => {});
+        const consoleErrorSpy = vi.spyOn(console, "error").mockImplementationOnce(() => {});
         const container = new DIContainer({
             service: ({ unknown }) => unknown().build()
         });
@@ -65,7 +65,7 @@ describe("di container", function() {
         });
 
         it("should inject dependencies if factory is not using injection", function() {
-            const dateNowSpy = jest.spyOn(Date, "now");
+            const dateNowSpy = vi.spyOn(Date, "now");
             const container = new DIContainer({
                 service1: () => Date,
                 service2: ({ service1 }) => ({
@@ -79,7 +79,7 @@ describe("di container", function() {
         });
 
         it("should not inject dependencies if factory is using injection", function() {
-            const dateNowSpy = jest.spyOn(Date, "now");
+            const dateNowSpy = vi.spyOn(Date, "now");
             const container = new DIContainer({
                 service1: () => Date
             });
@@ -142,7 +142,7 @@ describe("di container", function() {
         });
 
         it("should throw DIError if caught any error", function() {
-            jest.spyOn(console, "error").mockImplementationOnce(() => {});
+            vi.spyOn(console, "error").mockImplementationOnce(() => {});
 
             const container = new DIContainer({
                 service1: () => {

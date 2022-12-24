@@ -1,0 +1,31 @@
+{
+  "name": "dependency-container",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "main": "./dist/dependency-container.umd.cjs",
+  "module": "./dist/dependency-container.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/dependency-container.js",
+      "require": "./dist/dependency-container.umd.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@types/jest": "^29.2.4",
+    "@types/node": "^18.11.17",
+    "typescript": "^4.9.3",
+    "vite": "^4.0.0",
+    "vite-plugin-dts": "^1.7.1",
+    "vitest": "^0.26.2"
+  }
+}
