@@ -1,2 +1,2 @@
 // @ts-ignore
-export * from './di'
+export { createDIContainer, createDIContainer as default } from "./container.js";
