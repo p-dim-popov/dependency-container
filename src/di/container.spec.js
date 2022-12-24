@@ -10,7 +10,7 @@ describe("di container", function() {
             }
         });
 
-        expect(container._services).toEqual(
+        expect(container.__DEV__.injectables).toEqual(
             expect.objectContaining({
                 dateService: {
                     factory: dateServiceFactory,
@@ -24,12 +24,12 @@ describe("di container", function() {
         );
     });
 
-    it("should log caught and throw custom error when cannot resolve dependencies", function() {
+    it("should re-trow caught and throw custom error when cannot resolve dependencies", function() {
         const container = createDIContainer({
             service: ({ unknown }) => unknown().build()
         });
 
-        expect(() => container._getSelfResolvers().service).toThrowError(
+        expect(() => container.__DEV__.createResolverObject().service).toThrowError(
             new DIError(DIError.Code.CouldNotResolveDeps, "service")
         );
     });
@@ -119,13 +119,13 @@ describe("di container", function() {
         });
     });
 
-    describe("_getNamedResolver", function() {
+    describe("createServiceGetter", function() {
         const service1 = { now: () => 1 };
 
         it("should return function for resolving single service", function() {
             const container = createDIContainer({ service1 });
 
-            const resolver = container._getNamedResolver("service1");
+            const resolver = container.__DEV__.createServiceGetter("service1");
 
             expect(resolver.get()).toEqual(service1);
         });
@@ -133,21 +133,19 @@ describe("di container", function() {
         it("should re-throw if caught error is DIError", function() {
             const container = createDIContainer({ service1 });
 
-            const resolver = container._getNamedResolver("service2");
+            const resolver = container.__DEV__.createServiceGetter("service2");
 
             expect(resolver.get).toThrowError(new DIError(DIError.Code.NotRegistered, "service2"));
         });
 
         it("should throw DIError if caught any error", function() {
-            vi.spyOn(console, "error").mockImplementationOnce(() => {});
-
             const container = createDIContainer({
                 service1: () => {
                     throw new TypeError();
                 }
             });
 
-            const resolver = container._getNamedResolver("service1");
+            const resolver = container.__DEV__.createServiceGetter("service1");
 
             expect(resolver.get).toThrowError(new DIError(DIError.Code.CouldNotResolveDeps, "service1"));
         });

@@ -18,7 +18,7 @@ export default defineConfig({
         globals: true,
         includeSource: ['src/**/*.{ts,js}'],
         coverage: {
-            reporter: ['text-summary', 'text'],
+            reporter: ['text-summary', 'text', 'html', 'json-summary'],
         },
         mockReset: true,
         restoreMocks: true,

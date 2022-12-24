@@ -1,29 +1,29 @@
 export const createDIContainer = (init) => {
-    const _services = {};
+    const _injectables = {};
     if (init) {
-        attachServiceCollection(_services)(init)
+        attachInjectableCollection(_injectables)(init)
     }
     const _id = Symbol("di");
 
     const returnSelf = overrideReturn(() => self)
     const self = {
-        addCollection: returnSelf(attachServiceCollection(_services)),
-        add: returnSelf(attachService(_services)),
-        resolve: tryResolveService(_services, _id),
-        injectFunction: createDiInjectedFunction(_services, _id),
+        addCollection: returnSelf(attachInjectableCollection(_injectables)),
+        add: returnSelf(attachInjectable(_injectables)),
+        resolve: tryResolveInjectable(_injectables, _id),
+        injectFunction: createDiInjectedFunction(_injectables, _id),
         ...devOnlyObject({
-            _services,
-            _getSelfResolvers: getSelfResolvers(_services, _id),
-            _getNamedResolver: createServiceGetter(_services, _id),
+            injectables: _injectables,
+            createResolverObject: createResolverObject(_injectables, _id),
+            createServiceGetter: createServiceGetter(_injectables, _id),
         })
     }
 
     return self
 }
 
-const attachServiceCollection = services => collection => Object.entries(collection).forEach(value => attachService(services)(...value));
+const attachInjectableCollection = services => collection => Object.entries(collection).forEach(value => attachInjectable(services)(...value));
 
-const attachService = (services) => (serviceKey, serviceValue) => {
+const attachInjectable = (services) => (serviceKey, serviceValue) => {
     services[serviceKey] = {
         value: null,
         ...getNormalizedServiceInitObject(serviceValue)
@@ -44,7 +44,7 @@ const getNormalizedServiceInitObject = value => {
 
 const isInitObject = init => "factory" in init || "value" in init;
 
-const tryResolveService = (services, id) => name => {
+const tryResolveInjectable = (services, id) => name => {
     const service = services[name];
 
     if (!service) {
@@ -54,7 +54,7 @@ const tryResolveService = (services, id) => name => {
     if (service.value === null) {
         const factory = service.factory;
         try {
-            service.value = factory.__diId === id ? factory() : factory(getSelfResolvers(services)());
+            service.value = factory.__diId === id ? factory() : factory(createResolverObject(services, id)());
         } catch (e) {
             if (e instanceof DIError) throw e;
 
@@ -65,9 +65,9 @@ const tryResolveService = (services, id) => name => {
     return service.value;
 };
 
-const createServiceGetter = (services, id) => name => ({ get: () => tryResolveService(services, id)(name) });
+const createServiceGetter = (services, id) => name => ({ get: () => tryResolveInjectable(services, id)(name) });
 
-const getSelfResolvers = (services, id) => without => {
+const createResolverObject = (services, id) => without => {
     const skipKeys = without ? Object.keys(without) : [];
 
     return Object.defineProperties(
@@ -97,7 +97,7 @@ export class DIError extends Error {
 }
 
 const createDiInjectedFunction = (services, id) => fun => {
-    const funWithDI = (params, ...rest) => fun(getSelfResolvers(services, id)(params), ...rest);
+    const funWithDI = (params, ...rest) => fun(createResolverObject(services, id)(params), ...rest);
     funWithDI.__diId = id;
 
     return funWithDI;
@@ -108,4 +108,4 @@ const overrideReturn = (subject) => (fn) => (...args) => {
     return subject(result)
 }
 
-const devOnlyObject = ['test', 'development'].includes(process.env.NODE_ENV) ? (source) => source : () => ({})
+const devOnlyObject = ['test', 'development'].includes(process.env.NODE_ENV) ? (source) => ({ __DEV__: source }) : () => ({})
