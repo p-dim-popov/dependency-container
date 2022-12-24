@@ -1,4 +1,4 @@
-import {devOnlyObject} from "./utils/devOnlyObject";
+import {devOnlyObject, overrideReturn} from "./utils";
 
 export const createDIContainer = (init) => {
     const _injectables = {};
@@ -105,8 +105,3 @@ const createDiInjectedFunction = (services, id) => fun => {
 
     return funWithDI;
 };
-
-const overrideReturn = (subject) => (fn) => (...args) => {
-    const result = fn(...args)
-    return subject(result)
-}
