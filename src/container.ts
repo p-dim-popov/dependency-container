@@ -58,25 +58,24 @@ export const createDIContainer = <T extends ExtendableOnlyInjectables>(init: { [
 const attachInjectableCollection = <T extends ExtendableOnlyInjectables>(services: Partial<Injectables<T>>) => (collection: { [K in keyof T]?: InjectableInit<T, T[K]> }) => Object.entries(collection).forEach(value => attachInjectable(services)(...value));
 
 const attachInjectable = <T extends ExtendableOnlyInjectables>(services: Partial<Injectables<T>>) => <K extends keyof T>(serviceKey: K, serviceValue: InjectableInit<T, T[K]>) => {
-    services[serviceKey] = {
-        value: null,
-        ...getNormalizedServiceInitObject(serviceValue)
-    };
+    services[serviceKey] = createInjectable(serviceValue);
 };
 
-const getNormalizedServiceInitObject = <T extends ExtendableOnlyInjectables, R>(value: InjectableInit<T, R>) => {
-    if (isInitObject(value)) {
-        return value;
-    }
-
+const createInjectable = <T extends ExtendableOnlyInjectables, R>(value: InjectableInit<T, R>): Injectable<T, R> => {
     if (typeof value === "function") {
-        return { factory: value };
+        return { factory: value, value: null };
     }
 
-    return { value };
-};
+    if ('value' in value) {
+        return { value: value.value };
+    }
 
-const isInitObject = <T extends ExtendableOnlyInjectables, R>(init: InjectableInit<T, R>): init is (InjectableInitObject<T, R> | InjectableInitValue<R>) => "factory" in init || "value" in init;
+    if ('factory' in value) {
+        return { factory: value.factory, value: null }
+    }
+
+    return { value }
+};
 
 const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(services: Injectables<T>, id: Symbol) => <K extends keyof T>(name: K): T[K] => {
     const service = services[name];
