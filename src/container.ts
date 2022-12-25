@@ -16,13 +16,15 @@ type DiInjectedFunction<T extends ExtendableOnlyInjectables, Fn extends (deps: P
 
 type ExtendableOnlyInjectables = Record<string, unknown>
 
+type Injectables<T extends ExtendableOnlyInjectables> = { [K in keyof T]: Injectable<T, T[K]> }
+
 type Injectable<T extends ExtendableOnlyInjectables, R> = LazyInjectable<T, R> | EagerInjectable<R>
 
 type LazyInjectable<T extends ExtendableOnlyInjectables, R> = { factory: InjectableInitFactory<T, R>; value: R | null }
 
 type EagerInjectable<T> = { value: T }
 
-type Injectables<T extends ExtendableOnlyInjectables> = { [K in keyof T]: Injectable<T, T[K]> }
+type InjectableInitCollection<T extends ExtendableOnlyInjectables> = { [K in keyof T]?: InjectableInit<T, T[K]> }
 
 type InjectableInit<T extends ExtendableOnlyInjectables, R> = InjectableInitObject<T, R> | InjectableInitFactory<T, R> | InjectableInitValue<R>
 
@@ -32,7 +34,7 @@ type InjectableInitFactory<T extends ExtendableOnlyInjectables, R> = ((deps: Par
 
 type InjectableInitValue<T> = { value: T }
 
-export const createDIContainer = <T extends ExtendableOnlyInjectables>(init: { [K in keyof T]?: InjectableInit<T, T[K]> }): DIContainer<T> => {
+export const createDIContainer = <T extends ExtendableOnlyInjectables>(init: InjectableInitCollection<T>): DIContainer<T> => {
     const _injectables = {} as Injectables<T>;
     if (init) {
         attachInjectableCollection(_injectables)(init)
@@ -48,17 +50,17 @@ export const createDIContainer = <T extends ExtendableOnlyInjectables>(init: { [
         ...devOnlyObject({
             injectables: _injectables,
             createResolverObject: createResolverObject(_injectables, _id),
-            createServiceGetter: createServiceGetter(_injectables, _id),
+            createInjectableGetter: createInjectableGetter(_injectables, _id),
         })
     }
 
     return self
 }
 
-const attachInjectableCollection = <T extends ExtendableOnlyInjectables>(services: Partial<Injectables<T>>) => (collection: { [K in keyof T]?: InjectableInit<T, T[K]> }) => Object.entries(collection).forEach(value => attachInjectable(services)(...value));
+const attachInjectableCollection = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>) => (collection: InjectableInitCollection<T>) => Object.entries(collection).forEach(value => attachInjectable(injectables)(...value));
 
-const attachInjectable = <T extends ExtendableOnlyInjectables>(services: Partial<Injectables<T>>) => <K extends keyof T>(serviceKey: K, serviceValue: InjectableInit<T, T[K]>) => {
-    services[serviceKey] = createInjectable(serviceValue);
+const attachInjectable = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>) => <K extends keyof T>(name: K, config: InjectableInit<T, T[K]>) => {
+    injectables[name] = createInjectable(config);
 };
 
 const createInjectable = <T extends ExtendableOnlyInjectables, R>(value: InjectableInit<T, R>): Injectable<T, R> => {
@@ -77,50 +79,46 @@ const createInjectable = <T extends ExtendableOnlyInjectables, R>(value: Injecta
     return { value }
 };
 
-const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(services: Injectables<T>, id: Symbol) => <K extends keyof T>(name: K): T[K] => {
-    const service = services[name];
+const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => <K extends keyof T>(name: K): T[K] => {
+    const injectable = injectables[name];
 
-    if (typeof service !== 'object') {
-        throw new DIError(DIError.Code.NotRegistered, name);
+    if (typeof injectable !== 'object') {
+        throw new DIError(DIError.Code.NotRegistered, name.toString());
     }
 
-    if (service.value !== null) {
-        return service.value
+    if (injectable.value !== null) {
+        return injectable.value
     }
 
-    if (!('factory' in service)) {
-        throw new DIError(DIError.Code.CouldNotResolveDeps, name)
+    if (!('factory' in injectable)) {
+        throw new DIError(DIError.Code.CouldNotResolveDeps, name.toString())
     }
 
-    const factory = service.factory;
+    const factory = injectable.factory;
     try {
-        const result = ('__diId' in factory && factory.__diId === id) ? factory() : factory(createResolverObject(services, id)());
-        service.value = result
+        const result = ('__diId' in factory && factory.__diId === id) ? factory() : factory(createResolverObject(injectables, id)());
+        injectable.value = result
         return result
     } catch (error) {
         if (error instanceof DIError) throw error;
 
-        throw new DIError(DIError.Code.CouldNotResolveDeps, name, error);
+        throw new DIError(DIError.Code.CouldNotResolveDeps, name.toString(), error);
     }
 };
 
-const createServiceGetter = <T extends ExtendableOnlyInjectables>(services: Injectables<T>, id: Symbol) => (name: keyof T) => ({ get: () => tryResolveInjectable(services, id)(name) });
+const createInjectableGetter = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => (name: keyof T) => ({ get: () => tryResolveInjectable(injectables, id)(name) });
 
-const createResolverObject = <T extends ExtendableOnlyInjectables>(services: Injectables<T>, id: Symbol) => <P extends Partial<T>>(without?: P): Exclude<P, T> & Partial<T> => {
+const createResolverObject = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => <P extends Partial<T>>(without?: P): Exclude<P, T> & Partial<T> => {
     const skipKeys = without ? Object.keys(without) : [];
 
     const accumulator = (without ?? {}) as Exclude<P, T> & Partial<T>
     return Object.defineProperties(
         accumulator,
-        Object.keys(services)
-            .filter(prop => !skipKeys.includes(prop))
-            .reduce(
-                (acc, key) => ({
-                    ...acc,
-                    [key]: createServiceGetter(services, id)(key)
-                }),
-                {}
-            )
+        Object.fromEntries(
+            Object.keys(injectables)
+                .filter(prop => !skipKeys.includes(prop))
+                .map((key) => [key, createInjectableGetter(injectables, id)(key)])
+        )
     );
 };
 
@@ -130,15 +128,15 @@ export class DIError extends Error {
         CouldNotResolveDeps: "CouldNotResolveDeps"
     };
 
-    constructor(public code: string, public _message: string | number | symbol, public innerError?: unknown | Error) {
-        super(`${code}, ${_message.toString()}`);
+    constructor(public code: string, public message: string, public innerError?: unknown | Error) {
+        super(`${code}, ${message}`);
     }
 }
 
 const createDiInjectedFunction =
-    <T extends ExtendableOnlyInjectables>(services: Injectables<T>, id: Symbol) =>
+    <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) =>
         <Fn extends (deps?: Partial<T>, ...args: any[]) => any>(fun: Fn): DiInjectedFunction<T, Fn> => {
-            const funWithDI: DiInjectedFunction<T, Fn> = (params?: Parameters<Fn>[0], ...rest: any[] /** TODO: no any */) => fun(createResolverObject(services, id)(params), ...rest);
+            const funWithDI: DiInjectedFunction<T, Fn> = (params?: Parameters<Fn>[0], ...rest: unknown[]) => fun(createResolverObject(injectables, id)(params), ...rest);
             funWithDI.__diId = id;
 
             return funWithDI;

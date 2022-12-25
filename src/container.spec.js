@@ -132,13 +132,13 @@ describe("di container", function() {
         });
     });
 
-    describe("createServiceGetter", function() {
+    describe("createInjectableGetter", function() {
         const service1 = { now: () => 1 };
 
         it("should return function for resolving single service", function() {
             const container = createDIContainer({ service1 });
 
-            const resolver = container.__DEV__.createServiceGetter("service1");
+            const resolver = container.__DEV__.createInjectableGetter("service1");
 
             expect(resolver.get()).toEqual(service1);
         });
@@ -146,7 +146,7 @@ describe("di container", function() {
         it("should re-throw if caught error is DIError", function() {
             const container = createDIContainer({ service1 });
 
-            const resolver = container.__DEV__.createServiceGetter("service2");
+            const resolver = container.__DEV__.createInjectableGetter("service2");
 
             expect(resolver.get).toThrowError(new DIError(DIError.Code.NotRegistered, "service2"));
         });
@@ -158,7 +158,7 @@ describe("di container", function() {
                 }
             });
 
-            const resolver = container.__DEV__.createServiceGetter("service1");
+            const resolver = container.__DEV__.createInjectableGetter("service1");
 
             expect(resolver.get).toThrowError(new DIError(DIError.Code.CouldNotResolveDeps, "service1"));
         });
