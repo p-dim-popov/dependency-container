@@ -1,4 +1,4 @@
-import { createDIContainer, DIError } from "./container.js";
+import { createDIContainer, DIError } from "./container";
 
 describe("di container", function() {
     it("should instantiate with services", function() {
