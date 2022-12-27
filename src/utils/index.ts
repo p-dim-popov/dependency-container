@@ -1,2 +1,2 @@
 export {devOnlyObject} from './devOnlyObject'
-export {overrideReturn} from './overrideReturn'
+export {interceptReturn} from './interceptReturn'

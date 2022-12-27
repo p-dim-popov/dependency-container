@@ -1,4 +1,4 @@
-import {devOnlyObject, overrideReturn} from "./utils";
+import {devOnlyObject, interceptReturn} from "./utils";
 import {DevOnly} from "./utils/devOnlyObject";
 
 type DIContainer<T extends Dictionary> = {
@@ -50,7 +50,7 @@ export const createDIContainer = <T extends Dictionary>(init?: InjectableInitCol
     }
     const _id = Symbol("di");
 
-    const returnSelf = overrideReturn(() => self)
+    const returnSelf = interceptReturn(() => self)
     const self: DIContainer<T> = {
         addCollection: returnSelf(attachInjectableCollection(_injectables)),
         add: returnSelf(attachInjectable(_injectables)),
