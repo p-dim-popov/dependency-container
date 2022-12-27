@@ -4,15 +4,24 @@ import {DevOnly} from "./utils/devOnlyObject";
 type DIContainer<T extends ExtendableOnlyInjectables> = {
     resolve: <K extends keyof T>(name: K) => T[K]
     addCollection: (collection: { [K in keyof T]?: InjectableInit<T, T[K]> }) => DIContainer<T>
-    add: <K extends keyof T>(name: K, value: T[K]) => DIContainer<T>
-    injectFunction: <Fn extends (deps?: Partial<T>, ...args: any[]) => any>(fn: Fn) => DiInjectedFunction<T, Fn>
+    add: <K extends keyof T>(name: K, value: InjectableInit<T, T[K]>) => DIContainer<T>
+    injectFunction: <Fn extends (...args: any[]) => any>(fn: Fn) => DiInjectedFunction<T, Fn>
 } & DevOnly<{
     injectables: Injectables<T>
+    createInjectableGetter: <K extends keyof T>(name: K) => { get: () => T[K] }
 }>
 
-type DiInjectedFunction<T extends ExtendableOnlyInjectables, Fn extends (deps: Partial<T>, ...args: any[]) => any> =
-    ((...args: Parameters<Fn> extends [infer F] ? ([Exclude<F, T> & Partial<T> | undefined] | []) : Parameters<Fn> extends [infer F, ...infer R] ? [(Exclude<F, T> & Partial<T>) | undefined, ...R] : never) => ReturnType<Fn>)
+type DiInjectedFunction<T extends ExtendableOnlyInjectables, Fn extends (...args: any[]) => any> =
+    (Parameters<Fn> extends []
+        ? () => ReturnType<Fn>
+        : Parameters<Fn> extends [infer F]
+            ? (deps?: DiInjectedParam<T, F> | undefined) => ReturnType<Fn>
+            : Parameters<Fn> extends [infer F, ...infer R]
+                ? (deps: (DiInjectedParam<T, F>) | undefined, ...rest: R) => ReturnType<Fn>
+                : never)
     & { __diId: Symbol }
+
+type DiInjectedParam<T extends ExtendableOnlyInjectables, P> = Omit<P, keyof T> & Partial<Pick<T, keyof P & keyof T>>
 
 type ExtendableOnlyInjectables = Record<string, unknown>
 
@@ -30,11 +39,11 @@ type InjectableInit<T extends ExtendableOnlyInjectables, R> = InjectableInitObje
 
 type InjectableInitObject<T extends ExtendableOnlyInjectables, R> = { factory: InjectableInitFactory<T, R> }
 
-type InjectableInitFactory<T extends ExtendableOnlyInjectables, R> = ((deps: Partial<T>) => R) | DiInjectedFunction<T, (deps: Partial<T>) => R>
+type InjectableInitFactory<T extends ExtendableOnlyInjectables, R> = ((deps: T) => R) | (() => R) | DiInjectedFunction<T, (deps: T) => R>
 
 type InjectableInitValue<T> = { value: T }
 
-export const createDIContainer = <T extends ExtendableOnlyInjectables>(init: InjectableInitCollection<T>): DIContainer<T> => {
+export const createDIContainer = <T extends ExtendableOnlyInjectables>(init?: InjectableInitCollection<T>): DIContainer<T> => {
     const _injectables = {} as Injectables<T>;
     if (init) {
         attachInjectableCollection(_injectables)(init)
@@ -96,7 +105,12 @@ const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(injectables: 
 
     const factory = injectable.factory;
     try {
-        const result = ('__diId' in factory && factory.__diId === id) ? factory() : factory(createResolverObject(injectables, id)());
+        const result = ('__diId' in factory && typeof factory.__diId === 'symbol')
+            ? factory()
+            : (() => {
+                const deps = createResolverObject(injectables, id)();
+                return factory(deps);
+            })();
         injectable.value = result
         return result
     } catch (error) {
@@ -108,10 +122,20 @@ const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(injectables: 
 
 const createInjectableGetter = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => (name: keyof T) => ({ get: () => tryResolveInjectable(injectables, id)(name) });
 
-const createResolverObject = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => <P extends Partial<T>>(without?: P): Exclude<P, T> & Partial<T> => {
+const createResolverObject = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => <Deps>(without?: Deps | undefined): Deps & T => {
     const skipKeys = without ? Object.keys(without) : [];
 
-    const accumulator = (without ?? {}) as Exclude<P, T> & Partial<T>
+    const accumulator = (without ?? {}) as Deps & T
+
+    if (typeof Proxy !== 'undefined') {
+        return new Proxy(accumulator, {
+            get: (target, prop) => target[prop as keyof typeof target] ?? tryResolveInjectable(injectables, id)(prop as keyof T)
+        })
+    }
+
+    // This is less safe way to do that because if the service is not defined
+    // it won't throw not found error as we won't know which property is tried to be accessed,
+    // and it'll probably throw TypeError (cannot access property X of undefined) just before use
     return Object.defineProperties(
         accumulator,
         Object.fromEntries(
@@ -135,8 +159,11 @@ export class DIError extends Error {
 
 const createDiInjectedFunction =
     <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) =>
-        <Fn extends (deps?: Partial<T>, ...args: any[]) => any>(fun: Fn): DiInjectedFunction<T, Fn> => {
-            const funWithDI: DiInjectedFunction<T, Fn> = (params?: Parameters<Fn>[0], ...rest: unknown[]) => fun(createResolverObject(injectables, id)(params), ...rest);
+        <Fn extends (...args: any[]) => any>(fun: Fn): DiInjectedFunction<T, Fn> => {
+            const funWithDI = ((deps: unknown, ...rest: unknown[]) => {
+                const injectedDeps = createResolverObject(injectables, id)(deps)
+                return fun(injectedDeps, ...rest);
+            }) as DiInjectedFunction<T, Fn>;
             funWithDI.__diId = id;
 
             return funWithDI;

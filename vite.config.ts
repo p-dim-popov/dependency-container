@@ -15,7 +15,6 @@ export default defineConfig({
     },
     plugins: [dts()],
     test: {
-        globals: true,
         includeSource: ['src/**/*.{ts,js}'],
         coverage: {
             reporter: ['text-summary', 'text', 'html', 'json-summary'],
