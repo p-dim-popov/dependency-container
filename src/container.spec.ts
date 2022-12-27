@@ -42,11 +42,7 @@ describe("di container", function() {
 
     it("should throw when circular dependency is found", async function () {
         type Service = () => { build: () => string }
-        type Services = {
-            service1: Service
-            service2: Service
-        }
-        const container = createDIContainer<Services>({
+        const container = createDIContainer({
             service1: ({service2}: { service2: Service }) => () => ({ build: service2().build }),
             service2: ({service1}: { service1: Service }) => () => ({ build: service1().build }),
         });
