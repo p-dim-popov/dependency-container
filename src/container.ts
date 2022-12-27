@@ -1,7 +1,7 @@
 import {devOnlyObject, overrideReturn} from "./utils";
 import {DevOnly} from "./utils/devOnlyObject";
 
-type DIContainer<T extends ExtendableOnlyInjectables> = {
+type DIContainer<T extends Dictionary> = {
     resolve: <K extends keyof T>(name: K) => T[K]
     addCollection: (collection: { [K in keyof T]?: InjectableInit<T, T[K]> }) => DIContainer<T>
     add: <K extends keyof T>(name: K, value: InjectableInit<T, T[K]>) => DIContainer<T>
@@ -11,7 +11,7 @@ type DIContainer<T extends ExtendableOnlyInjectables> = {
     createInjectableGetter: <K extends keyof T>(name: K) => { get: () => T[K] }
 }>
 
-type DiInjectedFunction<T extends ExtendableOnlyInjectables, Fn extends (...args: any[]) => any> =
+type DiInjectedFunction<T extends Dictionary, Fn extends (...args: any[]) => any> =
     (Parameters<Fn> extends []
         ? () => ReturnType<Fn>
         : Parameters<Fn> extends [infer F]
@@ -21,29 +21,29 @@ type DiInjectedFunction<T extends ExtendableOnlyInjectables, Fn extends (...args
                 : never)
     & { __diId: Symbol }
 
-type DiInjectedParam<T extends ExtendableOnlyInjectables, P> = Omit<P, keyof T> & Partial<Pick<T, keyof P & keyof T>>
+type DiInjectedParam<T extends Dictionary, P> = Omit<P, keyof T> & Partial<Pick<T, keyof P & keyof T>>
 
-type ExtendableOnlyInjectables = Record<string, unknown>
+type Dictionary<T = unknown> = Record<string, T>
 
-type Injectables<T extends ExtendableOnlyInjectables> = { [K in keyof T]: Injectable<T, T[K]> }
+type Injectables<T extends Dictionary> = { [K in keyof T]: Injectable<T, T[K]> }
 
-type Injectable<T extends ExtendableOnlyInjectables, R> = LazyInjectable<T, R> | EagerInjectable<R>
+type Injectable<T extends Dictionary, R> = LazyInjectable<T, R> | EagerInjectable<R>
 
-type LazyInjectable<T extends ExtendableOnlyInjectables, R> = { factory: InjectableInitFactory<T, R>; value: R | null }
+type LazyInjectable<T extends Dictionary, R> = { factory: InjectableInitFactory<T, R>; value: R | null }
 
 type EagerInjectable<T> = { value: T }
 
-type InjectableInitCollection<T extends ExtendableOnlyInjectables> = { [K in keyof T]?: InjectableInit<T, T[K]> }
+type InjectableInitCollection<T extends Dictionary> = { [K in keyof T]?: InjectableInit<T, T[K]> }
 
-type InjectableInit<T extends ExtendableOnlyInjectables, R> = InjectableInitObject<T, R> | InjectableInitFactory<T, R> | InjectableInitValue<R>
+type InjectableInit<T extends Dictionary, R> = InjectableInitObject<T, R> | InjectableInitFactory<T, R> | InjectableInitValue<R>
 
-type InjectableInitObject<T extends ExtendableOnlyInjectables, R> = { factory: InjectableInitFactory<T, R> }
+type InjectableInitObject<T extends Dictionary, R> = { factory: InjectableInitFactory<T, R> }
 
-type InjectableInitFactory<T extends ExtendableOnlyInjectables, R> = ((deps: T) => R) | (() => R) | DiInjectedFunction<T, (deps: T) => R>
+type InjectableInitFactory<T extends Dictionary, R> = ((deps: T) => R) | (() => R) | DiInjectedFunction<T, (deps: T) => R>
 
 type InjectableInitValue<T> = { value: T }
 
-export const createDIContainer = <T extends ExtendableOnlyInjectables>(init?: InjectableInitCollection<T>): DIContainer<T> => {
+export const createDIContainer = <T extends Dictionary>(init?: InjectableInitCollection<T>): DIContainer<T> => {
     const _injectables = {} as Injectables<T>;
     if (init) {
         attachInjectableCollection(_injectables)(init)
@@ -66,13 +66,13 @@ export const createDIContainer = <T extends ExtendableOnlyInjectables>(init?: In
     return self
 }
 
-const attachInjectableCollection = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>) => (collection: InjectableInitCollection<T>) => Object.entries(collection).forEach(value => attachInjectable(injectables)(...value));
+const attachInjectableCollection = <T extends Dictionary>(injectables: Injectables<T>) => (collection: InjectableInitCollection<T>) => Object.entries(collection).forEach(value => attachInjectable(injectables)(...value));
 
-const attachInjectable = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>) => <K extends keyof T>(name: K, config: InjectableInit<T, T[K]>) => {
+const attachInjectable = <T extends Dictionary>(injectables: Injectables<T>) => <K extends keyof T>(name: K, config: InjectableInit<T, T[K]>) => {
     injectables[name] = createInjectable(config);
 };
 
-const createInjectable = <T extends ExtendableOnlyInjectables, R>(value: InjectableInit<T, R>): Injectable<T, R> => {
+const createInjectable = <T extends Dictionary, R>(value: InjectableInit<T, R>): Injectable<T, R> => {
     if (typeof value === "function") {
         return { factory: value, value: null };
     }
@@ -88,7 +88,7 @@ const createInjectable = <T extends ExtendableOnlyInjectables, R>(value: Injecta
     return { value }
 };
 
-const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => <K extends keyof T>(name: K): T[K] => {
+const tryResolveInjectable = <T extends Dictionary>(injectables: Injectables<T>, id: symbol) => <K extends keyof T>(name: K): T[K] => {
     const injectable = injectables[name];
 
     if (typeof injectable !== 'object') {
@@ -120,9 +120,9 @@ const tryResolveInjectable = <T extends ExtendableOnlyInjectables>(injectables: 
     }
 };
 
-const createInjectableGetter = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => (name: keyof T) => ({ get: () => tryResolveInjectable(injectables, id)(name) });
+const createInjectableGetter = <T extends Dictionary>(injectables: Injectables<T>, id: symbol) => (name: keyof T) => ({ get: () => tryResolveInjectable(injectables, id)(name) });
 
-const createResolverObject = <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) => <Deps>(without?: Deps | undefined): Deps & T => {
+const createResolverObject = <T extends Dictionary>(injectables: Injectables<T>, id: symbol) => <Deps>(without?: Deps | undefined): Deps & T => {
     const skipKeys = without ? Object.keys(without) : [];
 
     const accumulator = (without ?? {}) as Deps & T
@@ -158,7 +158,7 @@ export class DIError extends Error {
 }
 
 const createDiInjectedFunction =
-    <T extends ExtendableOnlyInjectables>(injectables: Injectables<T>, id: symbol) =>
+    <T extends Dictionary>(injectables: Injectables<T>, id: symbol) =>
         <Fn extends (...args: any[]) => any>(fun: Fn): DiInjectedFunction<T, Fn> => {
             const funWithDI = ((deps: unknown, ...rest: unknown[]) => {
                 const injectedDeps = createResolverObject(injectables, id)(deps)
