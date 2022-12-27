@@ -62,11 +62,7 @@ describe("di container", function() {
 
     it("should resolve service with dependencies when requested", function() {
         type Serializer = { parse: <T>(string: string) => T & { _time: number } }
-        type Services = {
-            dateService: DateConstructor
-            serializer: Serializer
-        }
-        const container = createDIContainer<Services>({
+        const container = createDIContainer({
             dateService: () => Date,
             serializer: {
                 factory: ({ dateService }: { dateService: DateConstructor }): Serializer => ({
